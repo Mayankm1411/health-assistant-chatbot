@@ -1,47 +1,49 @@
 # utils/predict.py
 
 import joblib
+import base64
 import os
+import io
 import numpy as np
 import pandas as pd
 
-# Load trained model and preprocessing tools
-model_path = os.path.join("ml_model", "model.pkl")
-model, selector, symptom_list, label_encoder = joblib.load(model_path)
+# Path to base64 model text
+base64_path = os.path.join("ml_model", "model_base64.txt")
 
-# Load supporting CSVs
+# Decode and load model
+with open(base64_path, "r") as f:
+    base64_data = f.read()
+
+model_bytes = base64.b64decode(base64_data)
+model_file = io.BytesIO(model_bytes)
+model, selector, symptom_list, label_encoder = joblib.load(model_file)
+
+# Load metadata
 description_df = pd.read_csv("data/description.csv")
 medications_df = pd.read_csv("data/medications.csv")
-precautions_df = pd.read_csv("data/precautions_df.csv").drop(columns=['Unnamed: 0'], errors='ignore')
+precautions_df = pd.read_csv("data/precautions_df.csv").drop(columns=["Unnamed: 0"], errors="ignore")
 
+# One-hot encoding
 def encode_symptoms(symptoms):
-    """
-    Converts selected symptoms into a binary vector.
-    """
     vector = np.zeros(len(symptom_list))
-    for symptom in symptoms:
-        if symptom in symptom_list:
-            idx = symptom_list.index(symptom)
+    for s in symptoms:
+        if s in symptom_list:
+            idx = symptom_list.index(s)
             vector[idx] = 1
     return vector
 
+# Main prediction function
 def predict_disease(symptoms):
-    """
-    Predicts disease based on symptoms and returns disease details.
-    """
-    # Encode symptoms and apply feature selection
-    encoded_vector = encode_symptoms(symptoms)
-    selected_features = selector.transform([encoded_vector])
-
-    # Make prediction
-    pred_index = model.predict(selected_features)[0]
+    encoded = encode_symptoms(symptoms)
+    selected = selector.transform([encoded])
+    pred_index = model.predict(selected)[0]
     disease = label_encoder.inverse_transform([pred_index])[0]
 
-    # Retrieve details
+    # Details
     desc = description_df[description_df['Disease'] == disease]['Description'].values[0]
     meds = medications_df[medications_df['Disease'] == disease]['Medication'].values[0]
     precautions = precautions_df[precautions_df['Disease'] == disease].iloc[:, 1:].values.flatten()
-    precautions = [p for p in precautions if p != "None" and pd.notna(p)]
+    precautions = [p for p in precautions if p and p != "None"]
 
     return {
         "disease": disease,
