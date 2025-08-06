@@ -6,7 +6,8 @@ import sys
 import pandas as pd
 
 # Add project root to sys.path for module imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
+
 
 from models.llm import get_chat_model
 from utils.predict import predict_disease
@@ -137,3 +138,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
